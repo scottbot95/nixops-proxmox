@@ -101,6 +101,29 @@ let
       };
     };
   };
+  passwordCredentialsOptions = {config , ...}: {
+    options = {
+      password = mkOption {
+        type = types.str;
+        description = ''
+          Proxmox password (username/password authentication)
+          It is better to use an API token or SSH authentication!
+        '';
+      };
+    };
+  };
+  authTokenOptions = {config , ...}: {
+    options = {
+      tokenName = mkOption {
+        type = types.str;
+        description = "Proxmox token name (API token)";
+      };
+      tokenValue = mkOption {
+        type = types.str;
+        description = "Proxmox token value (API token)";
+      };
+    };
+  };
 in {
   options.deployment.proxmox = {
     profile = mkOption {
@@ -136,26 +159,11 @@ in {
       '';
     };
 
-    tokenName = mkOption {
-      example = "";
-      type = types.nullOr types.str;
-      default = null;
-      description = "Proxmox token name (API token)";
-    };
-
-    tokenValue = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = "Proxmox token value (API token)";
-    };
-
-    password = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = ''
-        Proxmox password (username/password authentication)
-        It is better to use an API token or SSH authentication!
-      '';
+    credentials = mkOptions {
+      type = types.oneOf [
+        (types.submodule passwordCredentialsOptions)
+        (types.submodule authTokenOptions)
+      ]
     };
 
     verifySSL = mkOption {

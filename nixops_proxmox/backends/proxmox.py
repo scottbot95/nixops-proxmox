@@ -20,15 +20,13 @@ class VirtualMachineDefinition(MachineDefinition):
     def __int__(self, name: str, config):
         super().__init__(name, config)
 
-        for key in ('profile', 'serverUrl', 'username', 'tokenName',
-                    'tokenValue', 'password', 'useSSH', 'disks',
-                    'node', 'pool', 'nbCpus', 'nbCores', 'memory',
+        for key in ('profile', 'serverUrl', 'username', 'credentials', 'useSSH', 'disks',
+                    'node', 'pool', 'sockets', 'cores', 'memory',
                     'startOnBoot', 'protectVM', 'hotplugFeatures',
                     'cpuLimit', 'cpuUnits', 'cpuType', 'arch',
-                    'vmid',
-                    'postPartitioningLocalCommands',
+                    'vmid', 'postPartitioningLocalCommands',
                     'partitions', 'expertArgs', 'installISO', 'network',
-                    'uefi', 'useSSH', 'usePrivateIPAddress'):
+                    'uefi', 'usePrivateIPAddress'):
             setattr(self, key, getattr(self.config.proxmox, key))
 
     def show_type(self) -> str:
