@@ -126,20 +126,6 @@ let
   };
 in {
   options.deployment.proxmox = {
-    profile = mkOption {
-      example = "production1";
-      type = types.nullOr types.str;
-      default = null;
-      description = ''
-        A Proxmox profile, contained in $PROXMOX_CREDENTIALS_FILE
-        which defaults to $XDG_CONFIG_FILE/.proxmox/credentials.
-
-        A mechanism similar to ~/.aws/credentials
-        You can have a TOML containing server_url, username, token_name, token_value, use_ssh.
-        In a way that makes sense and it will be used, this avoids pushing secrets.
-      '';
-    };
-
     serverUrl = mkOption {
       example = "https://my-proxmox-ip:8006/api/…";
       type = types.nullOr types.str;
@@ -269,7 +255,7 @@ in {
       description = "This will make the virtual machine start at boot of the Proxmox host";
     };
 
-    protectVM = mkOption {
+    terminationProtection = mkOption {
       type = types.bool;
       default = false;
       description = "This will prevent the virtual machine from accidental deletion (disk and VM)";

@@ -15,7 +15,7 @@ class ProxmoxPlugin(Plugin):
     @staticmethod
     def load():
         return [
-            "nixops_proxmox.backends.pve"
+            "nixops_proxmox.backends.proxmox"
         ]
 
 

@@ -62,16 +62,16 @@ class ProxmoxOptions(ResourceOptions):
 
     uefi: UefiOptions
 
-    socket: int
+    sockets: int
     cores: int
     memory: int
 
     startOnBoot: bool
-    protectVM: bool
+    terminationProtection: bool
     hotplugFeatures: Optional[str]
     cpuLimit: Optional[str]
     cpuUnits: Optional[str]
-    cpuTypes: str
+    cpuType: str
     arch: Optional[Union[Literal["aarch64"], Literal["x86_64"]]]
 
     expertArgs: Optional[str]
