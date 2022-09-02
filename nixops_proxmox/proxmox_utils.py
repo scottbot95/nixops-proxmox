@@ -1,12 +1,11 @@
 from functools import partial
 from ipaddress import ip_address
+from typing import Optional
 
 import nixops.util
 import proxmoxer.backends.https
 from nixops.ssh_util import SSH
 from proxmoxer import ProxmoxAPI
-
-from nixops_proxmox.backends.options import CredentialsOptions, PasswordCredentialsOptions, AuthTokenOptions
 
 
 class EmptyClusterError(Exception):
@@ -29,20 +28,21 @@ def connect(
         server_url: str,
         username: str,
         *,
-        credentials: CredentialsOptions,
+        password: Optional[str],
+        token_name: Optional[str],
+        token_value: Optional[str],
         verify_ssl: bool = False,
         use_ssh: bool = False) -> ProxmoxAPI:
     kwargs = {
         "host": server_url,
         "user": username,
+        "password": password,
         "backend": "ssh_paramiko" if use_ssh else "https"
     }
 
-    if isinstance(credentials, PasswordCredentialsOptions):
-        kwargs["password"] = credentials.password
-    elif isinstance(credentials, AuthTokenOptions):
-        kwargs["token_name"] = credentials.tokenName
-        kwargs["token_value"] = credentials.tokenValue
+    if token_name and token_value and not use_ssh:
+        kwargs["token_name"] = token_name
+        kwargs["token_value"] = token_value
 
     if not use_ssh:
         kwargs["verify_ssl"] = verify_ssl

@@ -32,23 +32,13 @@ class UefiOptions(ResourceOptions):
     volume: str
 
 
-class PasswordCredentialsOptions(ResourceOptions):
-    password: str
-
-
-class AuthTokenOptions(ResourceOptions):
-    tokenName: str
-    tokenValue: str
-
-
-CredentialsOptions = Union[PasswordCredentialsOptions, AuthTokenOptions, None]
-
-
 class ProxmoxOptions(ResourceOptions):
     profile: Optional[str]
     serverUrl: Optional[str]
     username: Optional[str]
-    credentials: CredentialsOptions
+    password: Optional[str]
+    tokenName: Optional[str]
+    tokenValue: Optional[str]
     useSSH: bool
     verifySSL: bool
     usePrivateIPAddress: bool

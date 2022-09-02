@@ -101,29 +101,6 @@ let
       };
     };
   };
-  passwordCredentialsOptions = {config , ...}: {
-    options = {
-      password = mkOption {
-        type = types.str;
-        description = ''
-          Proxmox password (username/password authentication)
-          It is better to use an API token or SSH authentication!
-        '';
-      };
-    };
-  };
-  authTokenOptions = {config , ...}: {
-    options = {
-      tokenName = mkOption {
-        type = types.str;
-        description = "Proxmox token name (API token)";
-      };
-      tokenValue = mkOption {
-        type = types.str;
-        description = "Proxmox token value (API token)";
-      };
-    };
-  };
 in {
   options.deployment.proxmox = {
     serverUrl = mkOption {
@@ -145,11 +122,24 @@ in {
       '';
     };
 
-    credentials = mkOptions {
-      type = types.oneOf [
-        (types.submodule passwordCredentialsOptions)
-        (types.submodule authTokenOptions)
-      ]
+    password = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Proxmox password (username/password authentication)
+        It is better to use an API token or SSH authentication!
+      '';
+    };
+
+    tokenName = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Proxmox token name (API token)";
+    };
+    tokenValue = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Proxmox token value (API token)";
     };
 
     verifySSL = mkOption {
@@ -232,19 +222,19 @@ in {
     };
 
     sockets = mkOption {
-      type = types.unsigned types.int;
+      type = types.ints.unsigned;
       default = 1;
       description = "Number of CPUs allocated";
     };
 
     cores = mkOption {
-      type = types.unsigned types.int;
+      type = types.ints.unsigned;
       default = 1;
       description = "Number of cores per CPU";
     };
 
     memory = mkOption {
-      type = types.unsigned types.int;
+      type = types.ints.unsigned;
       default = null;
       description = "Amount of memory allocated in MB (note it will use the ballooning device)";
     };

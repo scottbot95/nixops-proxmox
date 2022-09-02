@@ -76,7 +76,9 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     serverUrl = nixops.util.attr_property('proxmox.serverUrl', None)
     node = nixops.util.attr_property('proxmox.node', None)
     username = nixops.util.attr_property('proxmox.username', None)
-    credentials = nixops.util.attr_property('proxmox.credentials', None, 'json')
+    password = nixops.util.attr_property('proxmox.password', None)
+    tokenName = nixops.util.attr_property('proxmox.tokenName', None)
+    tokenValue = nixops.util.attr_property('proxmox.tokenValue', None)
 
     useSSH = nixops.util.attr_property('proxmox.useSSH', False)
 
@@ -113,7 +115,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         self._cached_instance = None
 
     def _reset_state(self):
-        with self.depl.db:
+        with self.depl._db:
             self.state = MachineState.MISSING
             self.vm_id = None
             self._reset_network_knowledge()
@@ -134,7 +136,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                     ip,
                     self.public_host_key)
 
-        with self.depl.db:
+        with self.depl._db:
             self.public_ipv4 = None
             self.public_ipv6 = None
             self.private_ipv4 = None
@@ -160,29 +162,27 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     def resource_id(self):
         return self.vm_id
 
-    @property
-    def _client(self) -> ProxmoxAPI:
+    def _connect(self) -> ProxmoxAPI:
         if self._conn:
             return self._conn
         self._conn = nixops_proxmox.proxmox_utils.connect(
             self.serverUrl, self.username,
-            credentials=self.credentials,
+            password=self.password,
+            token_name=self.tokenName,
+            token_value=self.tokenValue,
             use_ssh=self.useSSH,
             verify_ssl=self.verifySSL
         )
         return self._conn
 
-    @property
-    def _node_client(self, node: Optional[str] = None) -> ProxmoxResource:
-        return self._client.nodes(node or self.node)
+    def _connect_node(self, node: Optional[str] = None) -> ProxmoxResource:
+        return self._connect().nodes(node or self.node)
 
-    @property
-    def _vm_client(self, vm_id: Optional[int] = None) -> ProxmoxResource:
-        return self._node_client.qemu(vm_id or self.resource_id)
+    def _connect_vm(self, vm_id: Optional[int] = None) -> ProxmoxResource:
+        return self._connect_node().qemu(vm_id or self.resource_id)
 
     def _get_instance(self, instance_id: Optional[int] = None, *, allow_missing: bool = False,
                       force_update: bool = False):
-        self._vm_client.get()
         if not instance_id:
             instance_id = self.resource_id
 
@@ -191,7 +191,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
 
             # noinspection PyBroadException
             try:
-                instance = self._vm_client(instance_id).status.current.get()
+                instance = self._connect_vm(instance_id).status.current.get()
             except Exception:
                 if allow_missing:
                     instance = None
@@ -206,11 +206,11 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         return 'NixOps auto-generated key' in self.public_host_key
 
     def _get_free_vmid(self):
-        return self._client.cluster.nextid.get()
+        return self._connect().cluster.nextid.get()
 
     def _allocate_disk_image(self, filename: str, size: str, volume: str, vmid: int) -> str:
         try:
-            return self._node_client.storage(volume).content.post(
+            return self._connect_node().storage(volume).content.post(
                 filename=filename,
                 size=size,
                 vmid=vmid
@@ -226,7 +226,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
             self.log_start('Generating new SSH key pair...')
             (private, public) = nixops.util.create_key_pair(type=defn.host_key_type())
 
-            with self.depl.db:
+            with self.depl._db:
                 self.public_host_key = public
                 self.private_host_key = private
 
@@ -307,20 +307,20 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
 
         try:
             self.logger.log_start('Creating proxmox VM...')
-            result = self._node_client.qemu.post(**options)
+            result = self._connect_node().qemu.post(**options)
         finally:
             self.logger.log_end('done')
 
         return result
 
     def _execute_command_with_agent(self, command: str, stdin_data: str = '', *, instance_id: Optional[int] = None):
-        result = self._vm_client(instance_id).agent.exec.post(**{
+        result = self._connect_vm(instance_id).agent.exec.post(**{
             'command': command,
             'input-data': stdin_data
         })
 
         def get_status():
-            return self._vm_client(instance_id).agent('exec-status').get(pid=int(result['pid']))
+            return self._connect_vm(instance_id).agent('exec-status').get(pid=int(result['pid']))
 
         current_status = get_status()
         while not current_status['exited']:
@@ -352,7 +352,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     def _provision_ssh_key_through_agent(self):
         self.log_start('Provisioning SSH key through QEMU Agent...')
         self._execute_command_with_agent('mkdir -p /root/.ssh')
-        self._vm_client.agent('file-write').post(
+        self._connect_vm().agent('file-write').post(
             content=f'# This was generated by NixOps during initial installation phase.\n' +
                     f'# Do not edit.\n{self.public_host_key}',
             file='/root/.ssh/authorized_keys'
@@ -366,7 +366,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         try:
             self.run_command('umount -R /mnt || true')
 
-            self._vm_client.agent('file-write').post(
+            self._connect_vm().agent('file-write').post(
                 content=f'#!/run/current-system/sw/bin/bash\n{partitions}',
                 file='/tmp/partition.sh'
             )
@@ -381,7 +381,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                 raise
 
         self.log_end('Partitioned')
-        with self.depl.db:
+        with self.depl._db:
             self.partitions = partitions
             self.fs_info = out
             self.partitioned = True
@@ -400,10 +400,10 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
             ('boot', 'kernelParams'): ['console=ttyS0'],
             ('services', 'openssh', 'enable'): True,
             ('services', 'qemuGuest', 'enable'): True,
-            ('systemd', 'services', 'qemu-guest-agent', 'serviceConfig'): {
-                'RuntimeDirectory': 'qemu-ga',
-                'ExecStart': RawValue('lib.mkForce "\\${pkgs.qemu.ga}/bin/qemu-ga -t /var/run/qemu-ga"')
-            },
+            # ('systemd', 'services', 'qemu-guest-agent', 'serviceConfig'): {
+            #     'RuntimeDirectory': 'qemu-ga',
+            #     'ExecStart': RawValue('lib.mkForce "\\${pkgs.qemu.ga}/bin/qemu-ga -t /var/run/qemu-ga"')
+            # },
             ('services', 'getty', 'autologinUser'): 'root',
             ('networking', 'firewall', 'allowedTCPPorts'): [22],
             ('users', 'users', 'root'): {
@@ -474,7 +474,9 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         self.profile = config.profile
         self.serverUrl = config.serverUrl
         self.username = config.username
-        self.credentials = config.credentials
+        self.password = config.password
+        self.tokenName = config.tokenName
+        self.tokenValue = config.tokenValue
         self.useSSH = config.useSSH
 
         assert self.serverUrl is not None, \
@@ -482,14 +484,14 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
             " set `deployment.proxmox.serverUrl` or a valid `deployment.proxmox.profile`"
         self.use_private_ip_address = config.usePrivateIPAddress
 
-        nodes = self._client.nodes.get()
+        nodes = self._connect().nodes.get()
         if len(nodes) == 0:
             raise Exception('No nodes found in Proxmox cluster')
         if len(nodes) > 1 and (config.node is None):
             raise Exception('Multiple nodes in Proxmox cluster. Please specify deployment.proxmox.node')
         self.node = config.node or nodes[0]['node']
 
-        pools = self._client.pools.get()
+        pools = self._connect().pools.get()
         assert config.pool is None or config.pool in [pool['poolid'] for pool in pools], \
             f'There is no pool named `{config.pool}`, ensure you set `deployment.proxmox.pool` to a valid value ' \
             "or verify your Proxmox user permissions or cluster."
@@ -533,7 +535,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                     else:
                         print('Failure', e)
 
-            with self.depl.db:
+            with self.depl._db:
                 self.vm_id = vmid
                 self.memory = config.memory
                 self.cpus = config.sockets
@@ -616,15 +618,15 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
             instance = self._get_instance(allow_missing=True)
 
         if instance:
-            self._vm_client.status.stop.post()
+            self._connect_vm().status.stop.post()
 
             instance = self._get_instance(force_update=True)
             while instance['status'] != 'stopped':
-                self.log_continue(f"[{instance['status']}]")
+                self.log_continue(f".")
                 time.sleep(2.5)
                 instance = self._get_instance(force_update=True)
 
-            self._vm_client.delete(purge=1)
+            self._connect_vm().delete(purge=1)
 
         self.log_end('')
         self._reset_network_knowledge()
@@ -637,14 +639,14 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
 
         self.log_start('Stopping Proxmox VM...')
 
-        self._vm_client.status.shutdown.post()
+        self._connect_vm().status.shutdown.post()
         self.state = self.STOPPING
 
         # Wait until it's really stopped
         def check_stopped() -> bool:
             instance = self._get_instance(force_update=True)
-            cur_state = instance['state']
-            self.log_continue(f"[{cur_state}]")
+            cur_state = instance['status']
+            self.log_continue(f".")
 
             if cur_state == 'stopped':
                 return True
@@ -655,7 +657,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         if not nixops.util.check_wait(check_stopped, initial=3, max_tries=300, exception=False):
             self.log_end('(timed out)')
             self.log_start('force-stopping Proxmox VM...')
-            self._vm_client.status.stop.post()
+            self._connect_vm().status.stop.post()
             nixops.util.check_wait(check_stopped, initial=3, max_tries=100)
 
         self.log_end('')
@@ -665,9 +667,10 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     def start(self) -> None:
         self.log(f"Starting Proxmox VM '{self.vm_id}'")
 
-        self._vm_client.status.start.post()
+        self._connect_vm().status.start.post()
         self.state = self.STARTING
 
+        time.sleep(3)
         self._wait_for_ip()
         self.wait_for_ssh()
         self.send_keys()
@@ -691,9 +694,9 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     def reboot(self, hard: bool = False) -> None:
         self.logger.log('Rebooting Proxmox VM...')
         if hard:
-            self._vm_client.status.reset.post()
+            self._connect_vm().status.reset.post()
         else:
-            self._vm_client.status.reboot.post()
+            self._connect_vm().status.reboot.post()
 
         self.state = self.STARTING
 
@@ -793,7 +796,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         ip_v6 = {str(ip) for ip in ip_addresses if isinstance(ip, IPv6Address)}
         ip_v4 = {str(ip) for ip in ip_addresses if isinstance(ip, IPv4Address)}
 
-        with self.depl.db:
+        with self.depl._db:
             self.private_ipv4 = first_reachable_or_none(self.logger, private_ips & ip_v4)
             self.public_ipv4 = first_reachable_or_none(self.logger, public_ips & ip_v4)
             self.private_ipv6 = first_reachable_or_none(self.logger, private_ips & ip_v6)
@@ -816,7 +819,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         assert bool(ins['agent']), "Cannot get network interfaces without QEMU Agent!"
         try:
             net_interfaces = {interface["name"]: interface for interface in
-                              self._vm_client.agent.get("network-get-interfaces").get("result")}
+                              self._connect_vm().agent.get("network-get-interfaces").get("result")}
             assert net_interfaces.get("lo") is not None, "No loopback interface in the result!"
         except Exception as e:
             return {}
