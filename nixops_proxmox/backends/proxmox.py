@@ -31,14 +31,6 @@ class VirtualMachineDefinition(MachineDefinition):
     def __int__(self, name: str, config: ResourceEval):
         super().__init__(name, config)
 
-        # for key in ('profile', 'serverUrl', 'username', 'credentials', 'useSSH', 'disks',
-        #             'node', 'pool', 'sockets', 'cores', 'memory',
-        #             'startOnBoot', 'protectVM', 'hotplugFeatures',
-        #             'cpuLimit', 'cpuUnits', 'cpuType', 'arch',
-        #             'vmid', 'postPartitioningLocalCommands',
-        #             'partitions', 'expertArgs', 'installISO', 'network',
-        #             'uefi', 'usePrivateIPAddress'):
-        #     setattr(self, key, getattr(self.config.proxmox, key))
 
     def show_type(self) -> str:
         return '{0} [{1}]'.format(self.get_type(), self.config.proxmox.serverUrl)
@@ -343,11 +335,17 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                 raise e
 
     def _wait_for_qemu_agent(self):
-        def _qemu_agent_is_running():
+        self.log_start("Waiting for QEMU Agent to start.")
+
+        def qemu_agent_is_running():
             if not self._qemu_agent_is_running():
                 raise ValueError("Did not return True")
 
-        nixops.util.wait_for_success(_qemu_agent_is_running)
+        def progress_cb():
+            self.log_continue(".")
+
+        nixops.util.wait_for_success(qemu_agent_is_running, callback=progress_cb)
+        self.log_end('')
 
     def _provision_ssh_key_through_agent(self):
         self.log_start('Provisioning SSH key through QEMU Agent...')
@@ -400,10 +398,6 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
             ('boot', 'kernelParams'): ['console=ttyS0'],
             ('services', 'openssh', 'enable'): True,
             ('services', 'qemuGuest', 'enable'): True,
-            # ('systemd', 'services', 'qemu-guest-agent', 'serviceConfig'): {
-            #     'RuntimeDirectory': 'qemu-ga',
-            #     'ExecStart': RawValue('lib.mkForce "\\${pkgs.qemu.ga}/bin/qemu-ga -t /var/run/qemu-ga"')
-            # },
             ('services', 'getty', 'autologinUser'): 'root',
             ('networking', 'firewall', 'allowedTCPPorts'): [22],
             ('users', 'users', 'root'): {
@@ -454,6 +448,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     def _post_install(self, host_key_type: str, check: bool):
         self._wait_for_ip()
 
+        self._provision_ssh_key_through_agent()  # Not sure if this is really the best place for this
         self._reinstall_host_key(host_key_type)
         self.write_ssh_private_key(self.private_host_key)
 
@@ -724,6 +719,8 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     def get_ssh_private_key_file(self) -> Optional[str]:
         if self._ssh_private_key_file:
             return self._ssh_private_key_file
+        if self.private_host_key:
+            return self.write_ssh_private_key(self.private_host_key)
 
     def get_console_output(self) -> str:
         # TODO capture serial output somehow
@@ -769,7 +766,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
 
         while True:
             instance = self._get_instance(force_update=True)
-            self.log_continue(f"[{instance['status']}]")
+            self.log_continue(f".")
 
             if instance['status'] == 'running':
                 net_ifs = self._get_network_interfaces()
