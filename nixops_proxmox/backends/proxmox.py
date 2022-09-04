@@ -335,6 +335,9 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                 raise e
 
     def _wait_for_qemu_agent(self):
+        if self._qemu_agent_is_running():  # Short-circuit if agent is already up
+            return
+
         self.log_start("Waiting for QEMU Agent to start.")
 
         def qemu_agent_is_running():
@@ -537,6 +540,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                 self.cores = config.cores
                 self.state = self.RESCUE
 
+        # Wait for instance to exist
         if self.state not in (self.UP, self.RESCUE) or check:
             while True:
                 if self._get_instance(allow_missing=True):
@@ -731,7 +735,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
             res.exists = False
             return
 
-        instance = self._get_instance(allow_missing=False)
+        instance = self._get_instance(allow_missing=True)
 
         if instance is None:
             self.state = self.MISSING
