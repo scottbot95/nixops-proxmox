@@ -351,6 +351,8 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         self.log_end('')
 
     def _provision_ssh_key_through_agent(self):
+        if self.ping():
+            return  # SSH key already provisioned
         self.log_start('Provisioning SSH key through QEMU Agent...')
         self._execute_command_with_agent('mkdir -p /root/.ssh')
         self._connect_vm().agent('file-write').post(
