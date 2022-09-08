@@ -31,7 +31,6 @@ class VirtualMachineDefinition(MachineDefinition):
     def __int__(self, name: str, config: ResourceEval):
         super().__init__(name, config)
 
-
     def show_type(self) -> str:
         return '{0} [{1}]'.format(self.get_type(), self.config.proxmox.serverUrl)
 
@@ -335,8 +334,12 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                 raise e
 
     def _wait_for_qemu_agent(self):
-        if self._qemu_agent_is_running():  # Short-circuit if agent is already up
-            return
+        try:
+            if self._qemu_agent_is_running():  # Short-circuit if agent is already up
+                return
+        except:
+            # Probably just not provisioned yet. Let wait_for_success handle this
+            pass
 
         self.log_start("Waiting for QEMU Agent to start.")
 
