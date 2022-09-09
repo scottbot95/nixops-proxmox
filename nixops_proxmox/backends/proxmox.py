@@ -15,7 +15,7 @@ from nixops.state import RecordId
 from proxmoxer import ProxmoxAPI, ProxmoxResource, ResourceException
 
 import nixops_proxmox.proxmox_utils
-from .options import ProxmoxMachineOptions
+from .options import ProxmoxMachineOptions, IPOptions
 from nixops_proxmox.proxmox_utils import to_prox_bool, can_reach, first_reachable_or_none
 
 
@@ -266,12 +266,17 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
 
             if net.ip:
                 ipConfig = []
+
+                def _append_addr(ip: IPOptions, v6: bool = False):
+                    suffix = "6" if v6 else ""
+                    if ip.gateway is not None:
+                        ipConfig.append(f'gw{suffix}={ip.gateway}')
+                    ipConfig.append(f'ip{suffix}={ip.address}/{ip.prefixLength or 32}')
+
                 if net.ip["v4"]:
-                    ipConfig.append(f'gw={net.ip["v4"].gateway}')
-                    ipConfig.append(f'ip={net.ip["v4"].address}/{net.ip["v4"].prefixLength}')
+                    _append_addr(net.ip["v4"])
                 if net.ip["v6"]:
-                    ipConfig.append(f'gw6={net.ip["v6"].gateway}')
-                    ipConfig.append(f'ip6={net.ip["v6"].address}/{net.ip["v6"].prefixLength}')
+                    _append_addr(net.ip["v6"], True)
 
                 if len(ipConfig) > 0:
                     options[f'ipconfig{i}'] = ','.join(ipConfig)
@@ -527,7 +532,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
                 vmid = config.vmid or self._get_free_vmid()
                 self.log(f'Creating VM in {self.node} ID: {vmid} with {config.memory} memory')
                 try:
-                    instance = self._create_instance(defn, vmid)
+                    self._create_instance(defn, vmid)
                     break
                 except Exception as e:
                     if 'already exists' in str(e):
