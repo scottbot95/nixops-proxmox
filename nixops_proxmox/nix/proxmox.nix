@@ -22,7 +22,7 @@ let
       };
       prefixLength = mkOption {
         example = 48;
-        type = types.nullOr types.str;
+        type = types.nullOr types.ints.unsigned;
         default = null;
         description = "Prefix length for the static address (optional)";
       };
