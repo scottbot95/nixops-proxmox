@@ -750,6 +750,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         instance = self._get_instance(allow_missing=True)
 
         if instance is None:
+            self.log(f'No VM with ID {self.vm_id} found on {self.serverUrl}')
             self.state = self.MISSING
             self.vm_id = None
             return
@@ -757,8 +758,10 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         res.exists = True
 
         if instance['status'] == 'running':
+            self.state = self.UP
             res.is_up = True
             res.disks_ok = True
+            self._wait_for_ip()
             super()._check(res)
         elif instance['status'] == 'stopped':
             res.is_up = False
