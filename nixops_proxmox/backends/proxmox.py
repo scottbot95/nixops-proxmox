@@ -71,6 +71,8 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     tokenName = nixops.util.attr_property('proxmox.tokenName', None)
     tokenValue = nixops.util.attr_property('proxmox.tokenValue', None)
 
+    vm_id = nixops.util.attr_property('proxmox.vm_id', None)
+
     useSSH = nixops.util.attr_property('proxmox.useSSH', False)
 
     verifySSL = nixops.util.attr_property('proxmox.verifySSL', False)
