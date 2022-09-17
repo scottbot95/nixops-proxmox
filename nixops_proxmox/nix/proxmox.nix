@@ -1,4 +1,4 @@
-{ config, pkgs, lib, utils, ... }:
+{ config, pkgs, lib, ... }:
 with lib;
 let
   cfg = config.deployment.proxmox;
