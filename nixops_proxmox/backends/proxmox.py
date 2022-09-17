@@ -773,7 +773,8 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         def _instance_ip_ready(interfaces):
             potential_ips = []
             for name, if_ in interfaces.items():
-                if name == "lo":
+                # probably should not restrict to just these types of interfaces, but who cares
+                if not (name.startswith("ens") or name.startswith("eth")):
                     continue
 
                 potential_ips.extend(if_.get('ip-addresses', []))

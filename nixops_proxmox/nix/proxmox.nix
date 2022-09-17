@@ -48,14 +48,14 @@ let
         '';
       };
       tag = mkOption {
-        type = types.nullOr types.int;
+        type = types.nullOr types.ints.unsigned;
         example = 100;
         default = null;
         description = "VLAN tag for this interface (optional)";
       };
       trunks = mkOption {
         default = [];
-        type = types.listOf types.int;
+        type = types.listOf types.ints.unsigned;
         example = [ 100 200 300 ];
         description = "VLAN trunks for this interface (optional)";
       };
