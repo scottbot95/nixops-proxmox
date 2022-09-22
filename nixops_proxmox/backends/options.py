@@ -21,6 +21,7 @@ class NetworkOptions(ResourceOptions):
 
 class DiskOptions(ResourceOptions):
     volume: str
+    label: Optional[str]
     size: str
     aio: Optional[str]
     enableSSDEmulation: bool

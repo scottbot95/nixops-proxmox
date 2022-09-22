@@ -286,7 +286,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
         # disks
         max_indexes = defaultdict(lambda: 0)
         for i, disk in enumerate(config.disks):
-            filename = f'vm-{vmid}-disk-{i}'
+            filename = f'vm-{vmid}-' + (disk.label if disk.label is not None else f'disk-{i}')
             options[f'scsi{i}'] = (','.join([
                                                 f'file={disk.volume}:{filename}',
                                                 f'size={disk.size}',

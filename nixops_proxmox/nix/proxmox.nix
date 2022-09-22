@@ -76,6 +76,13 @@ let
         example = "local";
         description = "Storage volume where to store the disk";
       };
+      label = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        defaultText = mdDoc "disk-*index*";
+        description = "Label suffix to use when determining new VM disk name.";
+        example = "nix-store";
+      };
       size = mkOption {
         type = types.either types.int types.str;
         example = "2G";
@@ -313,6 +320,16 @@ in {
 
   config = mkIf (config.deployment.targetEnv == "proxmox") {
     # TODO: assert that there is at least a valid option for authentication.
+    # TODO: should we use newer syntax for cross-compiling?
     nixpkgs.system = mkOverride 900 (if cfg.arch == "aarch64" then "aarch64-linux" else "x86_64-linux");
+
+    assertions = [{
+      assertion =
+        let
+          namedDisks = map (d: d.label) (filter (d: d.label != null) cfg.disks);
+        in
+          (length namedDisks) == (length (unique namedDisks));
+        message = "Non-null disk labels must be unique. Saw ${namedDisks}";
+    }];
   };
 }
