@@ -155,7 +155,7 @@ typing-extensions = "^3.7.4"
 type = "git"
 url = "https://github.com/NixOS/nixops.git"
 reference = "master"
-resolved_reference = "dcafae5258773dc0fbdd31b425f1ad3fb59173fe"
+resolved_reference = "683baa66c613216a662aad3fd58b0cdc5cd41adb"
 
 [[package]]
 name = "paramiko"
