@@ -1,3 +1,4 @@
+import subprocess
 from typing import Optional, Sequence, Mapping, Literal, Union
 
 from nixops.backends import MachineOptions
@@ -16,7 +17,7 @@ class NetworkOptions(ResourceOptions):
     tag: Optional[int]
     trunks: Sequence[str]
     ip: Mapping[Union[Literal["v4"], Literal["v6"]],
-                IPOptions]
+    IPOptions]
 
 
 class DiskOptions(ResourceOptions):
@@ -33,13 +34,18 @@ class UefiOptions(ResourceOptions):
     volume: str
 
 
+class SecretOptions(ResourceOptions):
+    text: Optional[str]
+    command: Optional[str]
+
+
 class ProxmoxOptions(ResourceOptions):
     profile: Optional[str]
     serverUrl: Optional[str]
-    username: Optional[str]
-    password: Optional[str]
-    tokenName: Optional[str]
-    tokenValue: Optional[str]
+    username: SecretOptions
+    password: SecretOptions
+    tokenName: SecretOptions
+    tokenValue: SecretOptions
     useSSH: bool
     verifySSL: bool
     usePrivateIPAddress: bool

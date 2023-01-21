@@ -108,6 +108,19 @@ let
       };
     };
   };
+  secretOptions = { config, ... }: {
+    options = {
+      text = mkOption {
+        type = with types; nullOr str;
+        description = "Raw text of the secret";
+        default = null;
+      };
+      command = mkOption {
+        type = with types; nullOr str;
+        default = null;
+      };
+    };
+  };
 in {
   options.deployment.proxmox = {
     serverUrl = mkOption {
@@ -121,8 +134,8 @@ in {
     };
 
     username = mkOption {
-      type = types.nullOr types.str;
-      default = null;
+      type = types.submodule secretOptions;
+      default = {};
       description = ''
         The Proxmox account username.
         Must have the correct rights to perform the operations.
@@ -130,8 +143,8 @@ in {
     };
 
     password = mkOption {
-      type = types.nullOr types.str;
-      default = null;
+      type = types.submodule secretOptions;
+      default = {};
       description = ''
         Proxmox password (username/password authentication)
         It is better to use an API token or SSH authentication!
@@ -139,13 +152,13 @@ in {
     };
 
     tokenName = mkOption {
-      type = types.nullOr types.str;
-      default = null;
+      type = types.submodule secretOptions;
+      default = {};
       description = "Proxmox token name (API token)";
     };
     tokenValue = mkOption {
-      type = types.nullOr types.str;
-      default = null;
+      type = types.submodule secretOptions;
+      default = {};
       description = "Proxmox token value (API token)";
     };
 
@@ -323,13 +336,15 @@ in {
     # TODO: should we use newer syntax for cross-compiling?
     nixpkgs.system = mkOverride 900 (if cfg.arch == "aarch64" then "aarch64-linux" else "x86_64-linux");
 
-    assertions = [{
-      assertion =
-        let
-          namedDisks = map (d: d.label) (filter (d: d.label != null) cfg.disks);
-        in
-          (length namedDisks) == (length (unique namedDisks));
-        message = "Non-null disk labels must be unique. Saw ${namedDisks}";
-    }];
+    assertions = [
+      {
+        assertion =
+          let
+            namedDisks = map (d: d.label) (filter (d: d.label != null) cfg.disks);
+          in
+            (length namedDisks) == (length (unique namedDisks));
+          message = "Non-null disk labels must be unique. Saw ${namedDisks}";
+      }
+    ];
   };
 }

@@ -1,3 +1,4 @@
+import subprocess
 import time
 from collections import defaultdict
 from ipaddress import IPv6Address, IPv4Address, ip_address
@@ -15,8 +16,21 @@ from nixops.state import RecordId
 from proxmoxer import ProxmoxAPI, ProxmoxResource, ResourceException
 
 import nixops_proxmox.proxmox_utils
-from .options import ProxmoxMachineOptions, IPOptions
+from .options import ProxmoxMachineOptions, IPOptions, SecretOptions
 from nixops_proxmox.proxmox_utils import to_prox_bool, can_reach, first_reachable_or_none
+
+
+def get_secret(secret: Optional[SecretOptions]) -> Optional[str]:
+    if secret is None:
+        return None
+
+    if secret.text is not None:
+        return secret.text
+
+    if secret.command is not None:
+        return subprocess.run(["sh", "-c", secret.command], stdout=subprocess.PIPE).stdout.decode('utf-8')
+
+    return None
 
 
 class VirtualMachineDefinition(MachineDefinition):
@@ -158,6 +172,7 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
     def _connect(self) -> ProxmoxAPI:
         if self._conn:
             return self._conn
+
         self._conn = nixops_proxmox.proxmox_utils.connect(
             self.serverUrl, self.username,
             password=self.password,
@@ -483,10 +498,10 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
 
         self.profile = config.profile
         self.serverUrl = config.serverUrl
-        self.username = config.username
-        self.password = config.password
-        self.tokenName = config.tokenName
-        self.tokenValue = config.tokenValue
+        self.username = get_secret(config.username)
+        self.password = get_secret(config.password)
+        self.tokenName = get_secret(config.tokenName)
+        self.tokenValue = get_secret(config.tokenValue)
         self.useSSH = config.useSSH
 
         assert self.serverUrl is not None, \
@@ -842,3 +857,4 @@ class VirtualMachineState(MachineState[VirtualMachineDefinition]):
             return {}
 
         return net_interfaces
+
