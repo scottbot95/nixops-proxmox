@@ -195,7 +195,7 @@ in {
     };
 
     partitions = mkOption {
-      type = types.str;
+      type = types.lines;
       default = "";
       example = ''
         wipefs -f /dev/sda
